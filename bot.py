@@ -83,3 +83,18 @@ def main():
 
 if __name__ == "__main__":
     main()
+# --- Piper (TTS) ---
+PIPER_MODEL = os.environ.get("PIPER_MODEL", "/app/voices/et_EE-aru-medium.onnx")
+PIPER_CFG   = os.environ.get("PIPER_CFG",   "/app/voices/et_EE-aru-medium.onnx.json")
+
+def tts_piper(text: str, out_wav: str):
+    cmd = ["piper", "-m", PIPER_MODEL, "-c", PIPER_CFG, "-f", out_wav]
+    subprocess.run(cmd, input=text.encode("utf-8"), check=True)
+
+async def send_voice(update: Update, text: str):
+    # генерим WAV → кодируем в OGG (opus) → отправляем voice
+    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as wav:
+        tts_piper(text, wav.name)
+        ogg = wav.name.replace(".wav", ".ogg")
+        subprocess.run(["ffmpeg","-y","-i", wav.name, "-c:a","libopus","-b:a","32k", ogg], check=True)
+    await update.message.reply_voice(voice=open(ogg,"rb"), caption=text[:1024])
